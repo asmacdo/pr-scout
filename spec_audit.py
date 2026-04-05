@@ -109,9 +109,9 @@ def _compare(summary, spec_diff, api_base, api_token, model):
 
 def audit(repo, base, pr):
     """Run the full spec audit and return a Result."""
-    api_base = _require_env("SPEC_AUDIT_API_BASE")
-    api_token = _require_env("SPEC_AUDIT_API_TOKEN")
-    model = _require_env("SPEC_AUDIT_MODEL")
+    api_base = _require_env("PR_SCOUT_OPENAI_BASE_URL")
+    api_token = _require_env("PR_SCOUT_OPENAI_API_KEY")
+    model = _require_env("PR_SCOUT_MODEL")
 
     spec_file = find_spec(repo, pr)
     if not spec_file:
@@ -141,6 +141,32 @@ def audit(repo, base, pr):
     )
 
 
+def format_comment(result):
+    """Build a markdown PR comment from a Result."""
+    status_line = {
+        "no_spec": "No spec file found",
+        "no_code_changes": "PR only changes the spec",
+        "missing_spec_update": "⚠️ Code changed but spec was not updated",
+        "pass": "✅ Spec update matches code changes",
+        "fail": "❌ Spec update does not match code changes",
+    }
+    lines = [
+        "## pr-scout: spec-audit",
+        "",
+        "<details>",
+        f"<summary>{status_line[result.status]}</summary>",
+    ]
+
+    if result.summary:
+        lines += ["", "### Code change summary", "", result.summary]
+
+    if result.verdict:
+        lines += ["", "### Verdict", "", result.verdict]
+
+    lines += ["", "</details>"]
+    return "\n".join(lines)
+
+
 def main():
     if len(sys.argv) != 4:
         print(f"Usage: {sys.argv[0]} <repo-path> <base-ref> <pr-ref>",
@@ -149,7 +175,9 @@ def main():
 
     repo, base, pr = sys.argv[1], sys.argv[2], sys.argv[3]
     result = audit(repo, base, pr)
-    print(json.dumps(asdict(result), indent=2))
+    output = asdict(result)
+    output["comment"] = format_comment(result)
+    print(json.dumps(output, indent=2))
 
 
 if __name__ == "__main__":

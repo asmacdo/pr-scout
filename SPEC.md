@@ -48,17 +48,13 @@ tool itself fails (missing config, git error, LLM unreachable).
 
 ## Configuration
 
-Each check defines its own environment variables, prefixed by the check name.
-
-### spec-audit
-
-Environment variables (all prefixed `SPEC_AUDIT_`):
+Environment variables (all prefixed `PR_SCOUT_`):
 
 | Variable | Required | Description |
 |---|---|---|
-| `SPEC_AUDIT_API_BASE` | yes | OpenAI-compatible API base URL |
-| `SPEC_AUDIT_API_TOKEN` | yes | API authentication token |
-| `SPEC_AUDIT_MODEL` | yes | Model identifier |
+| `PR_SCOUT_OPENAI_BASE_URL` | yes | OpenAI-compatible API base URL |
+| `PR_SCOUT_OPENAI_API_KEY` | yes | API key for the LLM endpoint |
+| `PR_SCOUT_MODEL` | yes | Model identifier |
 
 ## Usage
 
@@ -79,17 +75,18 @@ jobs:
         with:
           check: spec-audit
         env:
-          SPEC_AUDIT_API_BASE: ${{ secrets.SPEC_AUDIT_API_BASE }}
-          SPEC_AUDIT_API_TOKEN: ${{ secrets.SPEC_AUDIT_API_TOKEN }}
-          SPEC_AUDIT_MODEL: ${{ secrets.SPEC_AUDIT_MODEL }}
+          PR_SCOUT_OPENAI_BASE_URL: ${{ secrets.PR_SCOUT_OPENAI_BASE_URL }}
+          PR_SCOUT_OPENAI_API_KEY: ${{ secrets.PR_SCOUT_OPENAI_API_KEY }}
+          PR_SCOUT_MODEL: ${{ secrets.PR_SCOUT_MODEL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ### CLI
 
 ```bash
-export SPEC_AUDIT_API_BASE=https://api.example.com/v1
-export SPEC_AUDIT_API_TOKEN=sk-...
-export SPEC_AUDIT_MODEL=vertex_ai.gemini-2.5-flash
+export PR_SCOUT_OPENAI_BASE_URL=https://api.example.com/v1
+export PR_SCOUT_OPENAI_API_KEY=sk-...
+export PR_SCOUT_MODEL=vertex_ai.gemini-2.5-flash
 python spec_audit.py <repo-path> <base-ref> <pr-ref>
 ```
 

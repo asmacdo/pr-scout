@@ -1,0 +1,36 @@
+name: pr-scout
+description: AI-powered checks for pull requests
+
+inputs:
+  check:
+    description: Which check to run (e.g. spec-audit)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Run check
+      shell: bash
+      run: |
+        script="${{ inputs.check }}"
+        script="${script//-/_}.py"
+        python "${{ github.action_path }}/${script}" \
+          "${{ github.workspace }}" \
+          "${{ github.event.pull_request.base.sha }}" \
+          "${{ github.event.pull_request.head.sha }}" \
+          > "$RUNNER_TEMP/pr-scout-${{ inputs.check }}.json"
+
+    - name: Post PR comment
+      shell: bash
+      run: |
+        result="$RUNNER_TEMP/pr-scout-${{ inputs.check }}.json"
+        echo "--- pr-scout result ---"
+        jq . "$result"
+        echo "---"
+
+        comment=$(jq -r .comment "$result")
+        gh pr comment "${{ github.event.pull_request.number }}" \
+          --repo "${{ github.repository }}" \
+          --body "$comment"
+      env:
+        GH_TOKEN: ${{ env.GITHUB_TOKEN }}
