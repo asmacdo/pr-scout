@@ -37,8 +37,9 @@ whether that update accurately reflects the code changes.
 
 **Statuses:**
 
-- `no_spec` — repo has no spec file. No action taken.
-- `no_code_changes` — PR only touches the spec. No audit needed.
+- `no_spec` — repo has no spec file. Exits non-zero, no comment.
+- `skipped` — no relevant code changes (after applying ignore globs). No comment.
+- `spec_change_only` — spec changed but no code diff to validate against.
 - `missing_spec_update` — code changed but spec was not updated.
 - `pass` — spec update matches the code changes.
 - `fail` — spec update does not match or contradicts the code changes.
@@ -88,7 +89,7 @@ jobs:
 export PR_SCOUT_OPENAI_BASE_URL=https://api.example.com/v1
 export PR_SCOUT_OPENAI_API_KEY=sk-...
 export PR_SCOUT_MODEL=vertex_ai.gemini-2.5-flash
-python spec_audit.py <repo-path> <base-ref> <pr-ref>
+python spec_audit.py <repo-path> <base-ref> <pr-ref> [--ignore <glob>,<glob>]
 ```
 
 ## Output

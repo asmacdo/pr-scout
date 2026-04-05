@@ -22,7 +22,7 @@ def _require_env(name):
 
 @dataclass
 class Result:
-    status: str  # no_spec, no_code_changes, missing_spec_update, pass, fail
+    status: str  # no_spec, skipped, spec_change_only, missing_spec_update, pass, fail
     spec_file: str = ""
     summary: str = ""
     verdict: str = ""
@@ -107,21 +107,26 @@ def _compare(summary, spec_diff, api_base, api_token, model):
     )
 
 
-def audit(repo, base, pr):
+def audit(repo, base, pr, ignore_globs=None):
     """Run the full spec audit and return a Result."""
-    api_base = _require_env("PR_SCOUT_OPENAI_BASE_URL")
-    api_token = _require_env("PR_SCOUT_OPENAI_API_KEY")
-    model = _require_env("PR_SCOUT_MODEL")
-
     spec_file = find_spec(repo, pr)
     if not spec_file:
         return Result(status="no_spec")
 
-    code_diff = get_diff(repo, base, pr, ".", f":!{spec_file}")
+    excludes = [f":!{spec_file}"]
+    for glob in (ignore_globs or []):
+        excludes.append(f":!{glob}")
+    code_diff = get_diff(repo, base, pr, ".", *excludes)
     spec_diff = get_diff(repo, base, pr, spec_file)
 
     if not code_diff.strip():
-        return Result(status="no_code_changes", spec_file=spec_file)
+        if spec_diff.strip():
+            return Result(status="spec_change_only", spec_file=spec_file)
+        return Result(status="skipped")
+
+    api_base = _require_env("PR_SCOUT_OPENAI_BASE_URL")
+    api_token = _require_env("PR_SCOUT_OPENAI_API_KEY")
+    model = _require_env("PR_SCOUT_MODEL")
 
     summary = _summarize(code_diff, api_base, api_token, model)
 
@@ -144,7 +149,7 @@ def audit(repo, base, pr):
 def format_comment(result):
     """Build a markdown PR comment from a Result."""
     status_line = {
-        "no_code_changes": "PR only changes the spec",
+        "spec_change_only": "Spec changed but no code diff to validate against",
         "missing_spec_update": "⚠️ Code changed but spec was not updated",
         "pass": "✅ Spec update matches code changes",
         "fail": "❌ Spec update does not match code changes",
@@ -166,20 +171,32 @@ def format_comment(result):
     return "\n".join(lines)
 
 
+def parse_args(argv):
+    repo, base, pr = argv[1], argv[2], argv[3]
+    ignore_globs = []
+    if len(argv) > 4 and argv[4] == "--ignore":
+        ignore_globs = [g.strip() for g in argv[5].split(",") if g.strip()]
+    return repo, base, pr, ignore_globs
+
+
 def main():
-    if len(sys.argv) != 4:
-        print(f"Usage: {sys.argv[0]} <repo-path> <base-ref> <pr-ref>",
-              file=sys.stderr)
+    if len(sys.argv) < 4:
+        print(f"Usage: {sys.argv[0]} <repo-path> <base-ref> <pr-ref> "
+              "[--ignore <glob>,<glob>]", file=sys.stderr)
         sys.exit(1)
 
-    repo, base, pr = sys.argv[1], sys.argv[2], sys.argv[3]
-    result = audit(repo, base, pr)
+    repo, base, pr, ignore_globs = parse_args(sys.argv)
+    result = audit(repo, base, pr, ignore_globs)
 
     if result.status == "no_spec":
         candidates = ", ".join(SPEC_CANDIDATES)
         print(f"No spec file found (looked for: {candidates}), nothing to audit.",
               file=sys.stderr)
         sys.exit(1)
+
+    if result.status == "skipped":
+        print("No relevant changes to audit.", file=sys.stderr)
+        sys.exit(0)
 
     output = asdict(result)
     output["comment"] = format_comment(result)

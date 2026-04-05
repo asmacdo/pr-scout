@@ -5,6 +5,9 @@ inputs:
   check:
     description: Which check to run (e.g. spec-audit)
     required: true
+  ignore:
+    description: Comma-separated globs for paths that don't require a spec update
+    default: ""
 
 runs:
   using: composite
@@ -14,16 +17,23 @@ runs:
       run: |
         script="${{ inputs.check }}"
         script="${script//-/_}.py"
-        python "${{ github.action_path }}/${script}" \
-          "${{ github.workspace }}" \
-          "${{ github.event.pull_request.base.sha }}" \
-          "${{ github.event.pull_request.head.sha }}" \
+        args=("${{ github.workspace }}" \
+              "${{ github.event.pull_request.base.sha }}" \
+              "${{ github.event.pull_request.head.sha }}")
+        if [ -n "${{ inputs.ignore }}" ]; then
+          args+=(--ignore "${{ inputs.ignore }}")
+        fi
+        python "${{ github.action_path }}/${script}" "${args[@]}" \
           > "$RUNNER_TEMP/pr-scout-${{ inputs.check }}.json"
 
     - name: Post PR comment
       shell: bash
       run: |
         result="$RUNNER_TEMP/pr-scout-${{ inputs.check }}.json"
+        if [ ! -s "$result" ]; then
+          echo "No output — skipped."
+          exit 0
+        fi
         echo "--- pr-scout result ---"
         jq . "$result"
         echo "---"
@@ -38,7 +48,11 @@ runs:
     - name: Check result
       shell: bash
       run: |
-        status=$(jq -r .status "$RUNNER_TEMP/pr-scout-${{ inputs.check }}.json")
+        result="$RUNNER_TEMP/pr-scout-${{ inputs.check }}.json"
+        if [ ! -s "$result" ]; then
+          exit 0
+        fi
+        status=$(jq -r .status "$result")
         if [ "$status" = "fail" ] || [ "$status" = "missing_spec_update" ]; then
           echo "::error::spec-audit status: $status"
           exit 1
