@@ -43,8 +43,9 @@ whether that update accurately reflects the code changes.
 - `pass` — spec update matches the code changes.
 - `fail` — spec update does not match or contradicts the code changes.
 
-**Exit codes:** 0 when the audit completes (any status). Non-zero when the
-tool itself fails (missing config, git error, LLM unreachable).
+**Exit codes:** 0 when the audit completes and has a result to report.
+Non-zero on `no_spec` (nothing to audit) or tool failures (missing config,
+git error, LLM unreachable).
 
 ## Configuration
 

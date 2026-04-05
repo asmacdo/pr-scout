@@ -17,7 +17,7 @@ def _require_env(name):
     if not value:
         print(f"error: {name} is not set", file=sys.stderr)
         sys.exit(1)
-    return value
+    return value.strip()
 
 
 @dataclass
@@ -144,7 +144,6 @@ def audit(repo, base, pr):
 def format_comment(result):
     """Build a markdown PR comment from a Result."""
     status_line = {
-        "no_spec": "No spec file found",
         "no_code_changes": "PR only changes the spec",
         "missing_spec_update": "⚠️ Code changed but spec was not updated",
         "pass": "✅ Spec update matches code changes",
@@ -175,6 +174,13 @@ def main():
 
     repo, base, pr = sys.argv[1], sys.argv[2], sys.argv[3]
     result = audit(repo, base, pr)
+
+    if result.status == "no_spec":
+        candidates = ", ".join(SPEC_CANDIDATES)
+        print(f"No spec file found (looked for: {candidates}), nothing to audit.",
+              file=sys.stderr)
+        sys.exit(1)
+
     output = asdict(result)
     output["comment"] = format_comment(result)
     print(json.dumps(output, indent=2))
