@@ -34,3 +34,12 @@ runs:
           --body "$comment"
       env:
         GH_TOKEN: ${{ env.GITHUB_TOKEN }}
+
+    - name: Check result
+      shell: bash
+      run: |
+        status=$(jq -r .status "$RUNNER_TEMP/pr-scout-${{ inputs.check }}.json")
+        if [ "$status" = "fail" ] || [ "$status" = "missing_spec_update" ]; then
+          echo "::error::spec-audit status: $status"
+          exit 1
+        fi
